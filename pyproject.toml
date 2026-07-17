@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uiux-project-toolkit"
+version = "0.1.0"
+description = "Two dependency-free CLI tools that keep UI/UX projects consistent: a folder scaffolder and file-metadata sidecars."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Srdjan Markovic", email = "srdjan.markovic@libertyvote.com" },
+]
+keywords = ["scaffolding", "project-structure", "metadata", "ui", "ux", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Topic :: Utilities",
+]
+# Standard library only — no runtime dependencies.
+dependencies = []
+
+[project.scripts]
+new-project = "new_project:main"
+add-meta = "add_meta:main"
+
+[tool.setuptools]
+py-modules = ["new_project", "add_meta"]
