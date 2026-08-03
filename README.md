@@ -12,21 +12,27 @@ The goal is simple: every project looks the same, so anyone (including future‑
 can open any folder and immediately know where things live, what state they're in,
 and why each file exists.
 
+This repo is also the **single source of truth for the naming conventions** across every
+machine. Clone it once per machine, run `install.py`, and Claude Code applies the same
+rules everywhere. See [Multi-machine setup](#multi-machine-setup).
+
 ---
 
 ## Table of contents
 
 1. [Requirements](#requirements)
 2. [Quick start](#quick-start)
-3. [Command reference](#command-reference)
-4. [The folder structure](#the-folder-structure)
-5. [The seven disciplines](#the-seven-disciplines)
-6. [Discipline subfolders](#discipline-subfolders)
-7. [Naming conventions (strict)](#naming-conventions-strict)
-8. [Worked examples](#worked-examples)
-9. [File metadata (add_meta.py)](#file-metadata-add_metapy)
-10. [Rules & do / don't](#rules--do--dont)
-11. [FAQ](#faq)
+3. [Multi-machine setup](#multi-machine-setup)
+4. [Profiles](#profiles)
+5. [Command reference](#command-reference)
+6. [The folder structure](#the-folder-structure)
+7. [The seven disciplines](#the-seven-disciplines)
+8. [Discipline subfolders](#discipline-subfolders)
+9. [Naming conventions (strict)](#naming-conventions-strict)
+10. [Worked examples](#worked-examples)
+11. [File metadata (add_meta.py)](#file-metadata-add_metapy)
+12. [Rules & do / don't](#rules--do--dont)
+13. [FAQ](#faq)
 
 ---
 
@@ -62,28 +68,115 @@ python new_project.py --list-disciplines
 
 ---
 
+## Multi-machine setup
+
+The naming conventions only pay off if they're **identical everywhere**. So the repo is
+the source of truth and each machine points at its own clone — nothing is copied by hand,
+and `git pull` updates every machine.
+
+```bash
+git clone <your-remote> ~/dev/ux-toolkit
+cd ~/dev/ux-toolkit
+
+python install.py                          # dry run — prints what it would change
+python install.py --apply                  # work machine (default profile: work)
+python install.py --apply --profile personal   # private machine
+```
+
+`install.py` does three things, all idempotent and all reversible with `--uninstall`:
+
+| What                                        | Where                                    | Why |
+| ------------------------------------------- | ---------------------------------------- | --- |
+| `@`-imports `claude/CLAUDE.snippet.md`      | `~/.claude/CLAUDE.md`                    | Naming rules in context for **every** Claude Code session on the machine |
+| Links `claude/skills/project-organization/` | `~/.claude/skills/`                      | Folder structure + metadata guidance, loaded only when relevant |
+| Writes `profile = <name>`                   | `~/.uxkit`                               | This machine's default project shape |
+
+Notes:
+
+- It **never clobbers** your existing `~/.claude/CLAUDE.md` — the import goes in a marked
+  block, and everything around it is preserved. `--uninstall` removes just that block.
+- The skill is **symlinked** where possible, so a `git pull` is enough. On Windows without
+  Developer Mode symlinks aren't permitted, so it falls back to a copy and tells you to
+  re-run `install.py` after pulling. `--copy` forces that behaviour anywhere.
+- A `project-organization` directory you wrote yourself is never overwritten without
+  `--force`.
+- On macOS, `./install.sh` is a wrapper that finds `python3` for you.
+- Restart Claude Code afterwards so it picks up the new `CLAUDE.md` and skill.
+
+### Which file holds which rules
+
+| File                                            | Loaded         | Contains |
+| ----------------------------------------------- | -------------- | -------- |
+| `CONVENTIONS.md`                                | by humans      | The canonical, full naming reference |
+| `claude/CLAUDE.snippet.md`                      | every session  | The short always-on directive — kept deliberately brief, since it costs context every time |
+| `claude/skills/project-organization/SKILL.md`   | on demand      | Stages, disciplines, file placement, metadata workflow |
+
+Change `CONVENTIONS.md` first, then mirror the change into the other two.
+
+---
+
+## Profiles
+
+A **profile** answers "what shape should a project be?" — it's a property of the
+*machine*, not of each project, so the same command gives you the full studio structure
+at work and something lean at home.
+
+```bash
+python new_project.py --list-profiles      # what's available, and this machine's default
+python new_project.py my_app               # uses the machine default
+python new_project.py my_app --profile personal
+```
+
+| Profile    | Stages                                          | Disciplines            |
+| ---------- | ----------------------------------------------- | ---------------------- |
+| `work`     | research · prototyping · design · production     | all seven              |
+| `personal` | exploration · production                         | dev · design · research |
+
+Profiles are plain JSON in `profiles/` (JSON rather than TOML so the toolkit keeps
+running on Python 3.9 with zero dependencies). Add or edit them freely — `personal.json`
+is a starting point, not a decision you're locked into. **The naming conventions are not
+part of a profile**; they're identical on every machine by design.
+
+Resolution order, highest first:
+
+1. Explicit `--stages` / `--disciplines` — these override only the axis they name, so
+   `--stages spike --profile personal` keeps that profile's disciplines.
+2. `--profile NAME`
+3. `profile = <name>` in `~/.uxkit` (written by `install.py`)
+4. Built-in `work`
+
+Every run prints which of these it used, e.g. `Structure from: profile 'personal'`.
+
+---
+
 ## Command reference
 
 ```
 python new_project.py <project_name> [options]
 ```
 
-| Argument / option        | Required | Default                                    | Description                                                        |
-| ------------------------ | -------- | ------------------------------------------ | ------------------------------------------------------------------ |
-| `project_name`           | Yes*     | —                                          | Name of the new project. **Use snake_case** (see conventions).     |
-| `--base-dir PATH`        | No       | `.` (current dir)                          | Parent directory where the project folder is created.              |
-| `--stages STAGE ...`     | No       | `research prototyping design production`   | Which stage folders to create.                                     |
-| `--disciplines DISC ...` | No       | all seven                                  | Which disciplines to include. Keys from `--list-disciplines`.      |
-| `--list-disciplines`     | No       | —                                          | Print discipline keys → folder names, then exit.                   |
-| `--init-global`          | No       | off                                        | Also create a shared `_global_workspace/` next to the project.     |
-| `--force`                | No       | off                                        | Overwrite an existing `README.md` (otherwise it is left untouched). |
-| `--dry-run`              | No       | off                                        | Print planned actions without writing anything to disk.            |
+| Argument / option        | Required | Default                     | Description                                                        |
+| ------------------------ | -------- | --------------------------- | ------------------------------------------------------------------ |
+| `project_name`           | Yes*     | —                           | Name of the new project. **Use snake_case** (see conventions).     |
+| `--base-dir PATH`        | No       | `.` (current dir)           | Parent directory where the project folder is created.              |
+| `--profile NAME`         | No       | `~/.uxkit`, else `work`     | Structure profile to use. See [Profiles](#profiles).               |
+| `--stages STAGE ...`     | No       | the profile's stages        | Which stage folders to create. Overrides the profile.              |
+| `--disciplines DISC ...` | No       | the profile's disciplines   | Which disciplines to include. Keys from `--list-disciplines`.      |
+| `--list-profiles`        | No       | —                           | Print profiles, their shape and this machine's default, then exit. |
+| `--list-disciplines`     | No       | —                           | Print discipline keys → folder names, then exit.                   |
+| `--init-global`          | No       | off                         | Also create a shared `_global_workspace/` next to the project.     |
+| `--force`                | No       | off                         | Overwrite an existing `README.md` (otherwise it is left untouched). |
+| `--dry-run`              | No       | off                         | Print planned actions without writing anything to disk.            |
 
-\* `project_name` is required for every command **except** `--list-disciplines`.
+\* `project_name` is required for every command **except** `--list-disciplines` and
+`--list-profiles`.
 
 ### Examples
 
 ```bash
+# The lean structure, wherever you are
+python new_project.py side_project --profile personal
+
 # Only the disciplines you actually need
 python new_project.py voter_portal --disciplines dev design research
 
@@ -185,6 +278,10 @@ Convention for the common ones:
 ---
 
 ## Naming conventions (strict)
+
+> 📌 **[`CONVENTIONS.md`](CONVENTIONS.md) is the canonical copy** — it's what the Claude
+> Code directive and skill are generated from. Edit that file first; this section is a
+> summary for readers who are already here.
 
 > **Golden rule: `snake_case` everywhere, no spaces, ever.**
 > Spaces break command-line tools, URLs, and scripts, and behave inconsistently
@@ -419,5 +516,27 @@ folder has real content. Cache folders (`_cache/`) get a `.gitignore` instead, w
 both keeps the folder and ensures its regenerable contents are never committed.
 
 **Do I have to use all four stages?**
-No. Use `--stages` to pick your own (e.g. `--stages exploration production`).
-Stage names are free‑form, but keep them `snake_case` and consistent across projects.
+No. Use `--stages` to pick your own (e.g. `--stages exploration production`), or set a
+[profile](#profiles) so the machine defaults to the shape you actually want.
+
+**How do I get the naming rules onto another machine?**
+Clone the repo there and run `python install.py --apply` — see
+[Multi-machine setup](#multi-machine-setup). Don't copy the folder around by hand; you'd
+end up with three drifting versions of the same rules, which defeats the point.
+
+**Can each machine have a different structure but the same naming rules?**
+That's exactly what profiles are for. Structure is per-machine (`~/.uxkit`); naming is
+global and identical everywhere.
+
+**Why is `~/.uxkit` outside the repo?**
+It's a per-machine choice, not a shared one — committing it would mean every machine
+fighting over the same default. `install.py` writes it once and won't silently change an
+existing value unless you pass `--profile`.
+
+**Claude isn't following the naming rules — what do I check?**
+1. `~/.claude/CLAUDE.md` contains the `@…/CLAUDE.snippet.md` line (re-run `install.py`).
+2. The path in that line actually resolves — it breaks if you move the clone. Re-running
+   `install.py --apply` rewrites it.
+3. Claude Code was restarted after installing.
+4. Remember the rules deliberately yield to an existing codebase's conventions and
+   ecosystem-mandated filenames (`README.md`, `page.tsx`, `__init__.py`).

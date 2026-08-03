@@ -1,0 +1,10 @@
+# This repo is cloned on both Windows and macOS. Normalize to LF in the repo so
+# text files stay diff-clean across machines.
+* text=auto eol=lf
+
+# install.sh must keep LF endings — bash chokes on CRLF in the shebang line.
+*.sh text eol=lf
+
+# Windows-only files stay CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
