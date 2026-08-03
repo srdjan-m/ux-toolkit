@@ -1,0 +1,5 @@
+{
+  "description": "Lean structure for private machines - two stages, three disciplines. Starting point: edit freely, the naming conventions stay identical either way.",
+  "stages": ["exploration", "production"],
+  "disciplines": ["dev", "design", "research"]
+}

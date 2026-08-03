@@ -3,17 +3,26 @@
 new_project.py — Project folder scaffolder for UI/UX workflow
 Usage:
     python new_project.py my_app_name
+    python new_project.py my_app_name --profile personal
     python new_project.py my_app_name --stages research prototyping design production
     python new_project.py my_app_name --disciplines dev design 3d
     python new_project.py my_app_name --list-disciplines
+    python new_project.py --list-profiles
     python new_project.py my_app_name --dry-run
+
+The structure a machine produces by default comes from a profile (see profiles/).
+Set the machine default once in ~/.uxkit — `profile = personal` — so the same command
+gives the full studio structure at work and a lean one on a private machine, while the
+file naming conventions stay identical everywhere.
 """
 
 import argparse
 import datetime
+import json
 import re
 import sys
 from pathlib import Path
+from typing import Optional  # PEP 604 `str | None` needs 3.10; this keeps the 3.9 floor
 
 # ── Discipline definitions ─────────────────────────────────────────────────────
 
@@ -40,6 +49,23 @@ DISCIPLINE_SUBFOLDERS = {
 
 DEFAULT_STAGES = ["research", "prototyping", "design", "production"]
 DEFAULT_DISCIPLINES = list(DISCIPLINES.keys())
+
+# ── Profiles ──────────────────────────────────────────────────────────────────
+# A profile is the machine-level answer to "what shape should a project be?".
+# JSON rather than TOML so the script keeps working on Python 3.9 with no
+# dependencies (tomllib only landed in 3.11).
+
+PROFILE_DIR = Path(__file__).resolve().parent / "profiles"
+CONFIG_PATH = Path.home() / ".uxkit"
+FALLBACK_PROFILE = "work"
+
+# Used when no profile file can be found at all, so the script still runs from a
+# bare checkout with profiles/ missing.
+BUILTIN_PROFILE = {
+    "description": "Built-in fallback — full structure.",
+    "stages": DEFAULT_STAGES,
+    "disciplines": DEFAULT_DISCIPLINES,
+}
 
 README_TEMPLATE = """\
 # {project_name}
@@ -100,6 +126,98 @@ def validate_name(name: str, label: str = "project name") -> None:
         print("        Use lowercase letters, digits and single underscores only")
         print("        (e.g. my_app_name) - no spaces, capitals or special characters.")
         sys.exit(1)
+
+
+def available_profiles() -> list[str]:
+    """Profile names found in profiles/, sorted."""
+    if not PROFILE_DIR.is_dir():
+        return []
+    return sorted(p.stem for p in PROFILE_DIR.glob("*.json"))
+
+
+def load_profile(name: str) -> dict:
+    """Read profiles/<name>.json and validate its shape."""
+    path = PROFILE_DIR / f"{name}.json"
+    if not path.is_file():
+        found = available_profiles()
+        print(f"[error] Unknown profile '{name}' (looked for {path}).")
+        print(f"        Available: {', '.join(found) if found else '(none found)'}")
+        sys.exit(1)
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"[error] Could not read profile '{name}': {exc}")
+        sys.exit(1)
+
+    if not isinstance(data, dict):
+        print(f"[error] Profile '{name}' must be a JSON object.")
+        sys.exit(1)
+
+    for key in ("stages", "disciplines"):
+        value = data.get(key)
+        if not isinstance(value, list) or not value or not all(
+            isinstance(item, str) for item in value
+        ):
+            print(f"[error] Profile '{name}': '{key}' must be a non-empty list of strings.")
+            sys.exit(1)
+
+    return data
+
+
+def read_configured_profile() -> Optional[str]:
+    """Machine default profile from ~/.uxkit (`profile = personal`), if set.
+
+    Unrecognized keys are ignored so the file can grow without breaking old checkouts.
+    """
+    if not CONFIG_PATH.is_file():
+        return None
+    try:
+        lines = CONFIG_PATH.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        print(f"[warn] Could not read {CONFIG_PATH}: {exc}")
+        return None
+
+    for raw in lines:
+        line = raw.split("#", 1)[0].strip()
+        if not line or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() == "profile":
+            name = value.strip().strip("\"'")
+            if name:
+                return name
+    return None
+
+
+def resolve_structure(args: argparse.Namespace) -> tuple[list[str], list[str], str]:
+    """Decide stages + disciplines.
+
+    Precedence: explicit --stages/--disciplines > --profile > ~/.uxkit > fallback.
+    Explicit flags override only the axis they name, so `--stages a b --profile personal`
+    keeps that profile's disciplines.
+    """
+    name = args.profile or read_configured_profile()
+    source = f"profile '{name}'" if name else None
+
+    if name:
+        profile = load_profile(name)
+    elif FALLBACK_PROFILE in available_profiles():
+        profile = load_profile(FALLBACK_PROFILE)
+        source = f"default profile '{FALLBACK_PROFILE}'"
+    else:
+        profile = BUILTIN_PROFILE
+        source = "built-in defaults"
+
+    stages = args.stages if args.stages is not None else profile["stages"]
+    disciplines = args.disciplines if args.disciplines is not None else profile["disciplines"]
+
+    if args.stages is not None and args.disciplines is not None:
+        source = "command line"
+    elif args.stages is not None or args.disciplines is not None:
+        source = f"{source} + command line"
+
+    return list(stages), list(disciplines), source
 
 
 def resolve_disciplines(keys: list[str]) -> dict[str, tuple[str, str]]:
@@ -253,23 +371,35 @@ def parse_args() -> argparse.Namespace:
         help="Parent directory where the project folder will be created (default: current dir)",
     )
     parser.add_argument(
+        "--profile",
+        metavar="NAME",
+        help="Structure profile to use (default: the machine default in ~/.uxkit, "
+             f"else '{FALLBACK_PROFILE}'). See --list-profiles.",
+    )
+    parser.add_argument(
         "--stages",
         nargs="+",
-        default=DEFAULT_STAGES,
+        default=None,
         metavar="STAGE",
-        help=f"Stage folders to create (default: {' '.join(DEFAULT_STAGES)})",
+        help="Stage folders to create (overrides the profile's stages)",
     )
     parser.add_argument(
         "--disciplines",
         nargs="+",
-        default=DEFAULT_DISCIPLINES,
+        default=None,
         metavar="DISC",
-        help="Disciplines to include (default: all). See --list-disciplines.",
+        help="Disciplines to include (overrides the profile's disciplines). "
+             "See --list-disciplines.",
     )
     parser.add_argument(
         "--list-disciplines",
         action="store_true",
         help="Print available discipline keys and exit",
+    )
+    parser.add_argument(
+        "--list-profiles",
+        action="store_true",
+        help="Print available profiles and the structure each produces, then exit",
     )
     parser.add_argument(
         "--init-global",
@@ -298,19 +428,44 @@ def main() -> None:
             print(f"  {key:<14} -> {folder_name:<22} {desc}")
         sys.exit(0)
 
+    if args.list_profiles:
+        names = available_profiles()
+        if not names:
+            print(f"No profiles found in {PROFILE_DIR} — using built-in defaults.")
+            sys.exit(0)
+        configured = read_configured_profile()
+        print(f"Available profiles ({PROFILE_DIR}):\n")
+        for name in names:
+            profile = load_profile(name)
+            marker = "  <- machine default (~/.uxkit)" if name == configured else ""
+            print(f"  {name}{marker}")
+            if profile.get("description"):
+                print(f"      {profile['description']}")
+            print(f"      stages:      {', '.join(profile['stages'])}")
+            print(f"      disciplines: {', '.join(profile['disciplines'])}\n")
+        if not configured:
+            print(f"No machine default set — falling back to '{FALLBACK_PROFILE}'.")
+            print(f"Set one with:  echo 'profile = personal' > {CONFIG_PATH}")
+        sys.exit(0)
+
     if not args.project_name:
-        print("[error] project_name is required unless using --list-disciplines")
+        print("[error] project_name is required unless using "
+              "--list-disciplines or --list-profiles")
         sys.exit(1)
 
+    raw_stages, raw_disciplines, source = resolve_structure(args)
+
     validate_name(args.project_name)
-    for stage in args.stages:
+    for stage in raw_stages:
         validate_name(stage, label="stage name")
 
     # Drop duplicate stages while preserving the order they were given.
-    stages = list(dict.fromkeys(args.stages))
+    stages = list(dict.fromkeys(raw_stages))
 
     base_dir     = Path(args.base_dir).expanduser().resolve()
-    disciplines  = resolve_disciplines(args.disciplines)
+    disciplines  = resolve_disciplines(list(dict.fromkeys(raw_disciplines)))
+
+    print(f"Structure from: {source}")
 
     if args.init_global:
         scaffold_global_workspace(base_dir, args.dry_run)

@@ -1,0 +1,5 @@
+{
+  "description": "Full studio structure - four process stages, all seven disciplines.",
+  "stages": ["research", "prototyping", "design", "production"],
+  "disciplines": ["dev", "research", "design", "illustration", "motion", "3d", "diagrams"]
+}
