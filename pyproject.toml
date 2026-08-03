@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "Srdjan Markovic", email = "srdjan.markovic@libertyvote.com" },
+    { name = "Srdjan Markovic", email = "srdjan@markovi.ch" },
 ]
 keywords = ["scaffolding", "project-structure", "metadata", "ui", "ux", "cli"]
 classifiers = [
