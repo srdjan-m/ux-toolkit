@@ -9,6 +9,8 @@ Usage:
     python new_project.py my_app_name --list-disciplines
     python new_project.py --list-profiles
     python new_project.py my_app_name --dry-run
+    python new_project.py product_reveal --type video
+    python new_project.py product_reveal --type video --init-global
 
 The structure a machine produces by default comes from a profile (see profiles/).
 Set the machine default once in ~/.uxkit — `profile = personal` — so the same command
@@ -50,6 +52,41 @@ DISCIPLINE_SUBFOLDERS = {
 DEFAULT_STAGES = ["research", "prototyping", "design", "production"]
 DEFAULT_DISCIPLINES = list(DISCIPLINES.keys())
 
+# ── Video projects ────────────────────────────────────────────────────────────
+# Video work flows one way — sources → graphics / 3d / audio → motion → exports — so
+# it gets a flat pipeline instead of stage → discipline. Every folder is always
+# created, whether the project is 2D- or 3D-heavy, and the numbers never change:
+# 06_motion means the same thing in every video project. Not driven by profiles —
+# a video project has the same shape on every machine.
+
+VIDEO_FOLDERS = {
+    "docs":     ("01_docs",     "Script, brief, storyboard, client feedback"),
+    "sources":  ("02_sources",  "Received material, never edited: video, audio, images"),
+    "graphics": ("03_graphics", "Photoshop / Illustrator / Figma graphics"),
+    "3d":       ("04_3d",       "Blender scenes, assets, image-sequence renders"),
+    "audio":    ("05_audio",    "Audition sessions and mixdowns"),
+    "motion":   ("06_motion",   "After Effects projects and master renders"),
+    "exports":  ("07_exports",  "Delivery encodes sent to the client"),
+}
+
+# Nested paths are allowed: renders keep their own _archive so superseded sequence
+# folders don't mix with superseded .blend / .aep files.
+VIDEO_SUBFOLDERS = {
+    "docs":     [],
+    "sources":  ["video", "audio", "images", "other"],
+    "graphics": ["working", "exports", "_archive"],
+    "3d":       ["scenes", "assets", "renders", "renders/_archive", "_cache", "_archive"],
+    "audio":    ["sessions", "mixdowns", "_archive"],
+    "motion":   ["projects", "renders", "renders/_archive", "_cache", "_archive"],
+    "exports":  ["_archive"],
+}
+
+# Shared across every video project, created next to them with --init-global.
+VIDEO_WORKSPACE = {
+    "_assets":    ["music", "sfx", "fonts", "luts", "brand"],
+    "_templates": ["ae", "blender"],
+}
+
 # ── Profiles ──────────────────────────────────────────────────────────────────
 # A profile is the machine-level answer to "what shape should a project be?".
 # JSON rather than TOML so the script keeps working on Python 3.9 with no
@@ -88,6 +125,47 @@ Created: {date}
 ## Notes
 """
 
+VIDEO_README_TEMPLATE = """\
+# {project_name}
+
+Created: {date}
+Type: video
+
+## Brief
+- Client / requested by:
+- Deadline:
+- Deliverables (resolution · fps · duration · format):
+
+## Pipeline
+{folder_list}
+
+## Working rules
+- `02_sources/` holds received material only. Never edit it; work on copies elsewhere.
+- File names: `{project_name}_feature_v01.ext` (`.aep`, `.blend`, `.psd`, `.sesx`).
+- Image sequences: one folder per sequence and version, frames named like the folder:
+  `04_3d/renders/{project_name}_shot_v01/{project_name}_shot_v01_0001.png`
+  Blender output path: `//../renders/{project_name}_shot_v01/{project_name}_shot_v01_`
+- Never rename a file or folder another app links to (renders, mixdowns, exports
+  used in AE). Track its status in a sidecar instead — see Tracking.
+- New render version: render into a new `_v02` folder, then in AE select the old item →
+  File › Replace Footage › File. Move the old folder (and its `.meta.md`) into
+  `renders/_archive/`.
+- Move or copy the whole project folder, never the `.aep` alone — AE relinks footage
+  relative to the project file.
+- Leave app-generated folders where the app puts them (AE `Auto-Save/`, Audition
+  `Backup/` and `Imported Files/`).
+
+## Tracking
+Status lives in `.meta.md` sidecars, never in the names of linked files. Run from this
+folder, with `<ux-toolkit>` being wherever the toolkit is cloned:
+
+    python <ux-toolkit>/add_meta.py set 04_3d/renders/{project_name}_shot_v02 --status review --reason "..."
+    python <ux-toolkit>/add_meta.py set 07_exports/{project_name}_full_v03-web.mp4 --status approved --requested-by client
+    python <ux-toolkit>/add_meta.py index .     # regenerates INDEX.md + assets.csv
+
+## Notes
+"""
+
 # Project-root .gitignore. Note: `_cache/` folders are intentionally NOT listed here —
 # each carries its own self-ignoring .gitignore so the folder is kept while its
 # contents stay out of version control. A `**/_cache/` rule here would drop the folder.
@@ -109,6 +187,15 @@ __pycache__/
 .venv/
 dist/
 build/
+"""
+
+# Appended for video projects: files the apps regenerate on their own.
+GITIGNORE_VIDEO = """\
+
+# ── Video apps (regenerable) ─────────────────────
+*.pkf
+*.cfa
+*.blend1
 """
 
 
@@ -278,16 +365,21 @@ def build_discipline_tree(
     parent: Path,
     disciplines: dict[str, tuple[str, str]],
     dry_run: bool,
+    subfolders: Optional[dict[str, list[str]]] = None,
 ) -> None:
     """Create each discipline folder and its subfolders under `parent`."""
+    subfolders = DISCIPLINE_SUBFOLDERS if subfolders is None else subfolders
     for key, (folder_name, _) in disciplines.items():
         disc_path = parent / folder_name
         make_dir(disc_path, dry_run)
-        for sub in DISCIPLINE_SUBFOLDERS.get(key, []):
+        subs = subfolders.get(key, [])
+        if not subs:
+            make_gitkeep(disc_path, dry_run)
+        for sub in subs:
             sub_path = disc_path / sub
             make_dir(sub_path, dry_run)
             # Cache folders get a self-ignoring .gitignore; everything else a .gitkeep.
-            if is_cache(sub):
+            if is_cache(sub_path.name):
                 make_gitignore(sub_path, dry_run)
             else:
                 make_gitkeep(sub_path, dry_run)
@@ -352,6 +444,43 @@ def scaffold_global_workspace(base_dir: Path, dry_run: bool) -> None:
     print(f"\n{'[dry-run] ' if dry_run else ''}Global workspace created at {workspace}")
 
 
+def scaffold_video_project(
+    base_dir: Path,
+    project_name: str,
+    dry_run: bool,
+    force: bool,
+) -> None:
+    root = base_dir / project_name
+    make_dir(root, dry_run)
+
+    build_discipline_tree(root, VIDEO_FOLDERS, dry_run, subfolders=VIDEO_SUBFOLDERS)
+
+    folder_list = "\n".join(f"  - `{v[0]}/` — {v[1]}" for v in VIDEO_FOLDERS.values())
+    content = VIDEO_README_TEMPLATE.format(
+        project_name=project_name,
+        date=datetime.date.today().isoformat(),
+        folder_list=folder_list,
+    )
+    write_guarded_file(root / "README.md", content, dry_run, force)
+    write_guarded_file(root / ".gitignore", GITIGNORE_PROJECT + GITIGNORE_VIDEO, dry_run, force)
+
+    print(f"\n{'[dry-run] ' if dry_run else ''}Video project '{project_name}' scaffolded at {root}")
+    print(f"  Pipeline: {', '.join(v[0] for v in VIDEO_FOLDERS.values())}")
+
+
+def scaffold_video_workspace(base_dir: Path, dry_run: bool) -> None:
+    """Create the shared _assets/ and _templates/ folders next to the video projects."""
+    for meta, subs in VIDEO_WORKSPACE.items():
+        make_dir(base_dir / meta, dry_run)
+        for sub in subs:
+            sub_path = base_dir / meta / sub
+            make_dir(sub_path, dry_run)
+            make_gitkeep(sub_path, dry_run)
+
+    print(f"\n{'[dry-run] ' if dry_run else ''}Shared video workspace created in {base_dir}")
+    print(f"  {', '.join(VIDEO_WORKSPACE)}")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def parse_args() -> argparse.Namespace:
@@ -369,6 +498,13 @@ def parse_args() -> argparse.Namespace:
         "--base-dir",
         default=".",
         help="Parent directory where the project folder will be created (default: current dir)",
+    )
+    parser.add_argument(
+        "--type",
+        choices=("ux", "video"),
+        default="ux",
+        help="Project type: 'ux' (stage -> discipline, shaped by the profile) or "
+             "'video' (fixed pipeline 01_docs ... 07_exports; ignores profiles)",
     )
     parser.add_argument(
         "--profile",
@@ -404,7 +540,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--init-global",
         action="store_true",
-        help="Also create the _global_workspace folder alongside the project",
+        help="Also create the shared workspace alongside the project "
+             "(_global_workspace/ for ux; _assets/ and _templates/ for video)",
     )
     parser.add_argument(
         "--force",
@@ -421,6 +558,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+
+    if args.list_disciplines and args.type == "video":
+        print("Video pipeline (always created in full):")
+        for key, (folder_name, desc) in VIDEO_FOLDERS.items():
+            subs = " · ".join(VIDEO_SUBFOLDERS[key]) or "-"
+            print(f"  {folder_name:<12} {desc}")
+            print(f"  {'':<12} {subs}")
+        sys.exit(0)
 
     if args.list_disciplines:
         print("Available disciplines:")
@@ -452,6 +597,21 @@ def main() -> None:
         print("[error] project_name is required unless using "
               "--list-disciplines or --list-profiles")
         sys.exit(1)
+
+    if args.type == "video":
+        if args.profile or args.stages is not None or args.disciplines is not None:
+            print("[error] --profile, --stages and --disciplines don't apply to --type video;")
+            print("        video projects always get the full 01_docs ... 07_exports pipeline.")
+            sys.exit(1)
+        validate_name(args.project_name)
+        base_dir = Path(args.base_dir).expanduser().resolve()
+        print("Structure from: video pipeline")
+        if args.init_global:
+            scaffold_video_workspace(base_dir, args.dry_run)
+        scaffold_video_project(base_dir, args.project_name, args.dry_run, args.force)
+        if not args.dry_run:
+            print("\nDone. Open README.md inside the project to fill in the brief.")
+        return
 
     raw_stages, raw_disciplines, source = resolve_structure(args)
 

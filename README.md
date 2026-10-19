@@ -28,11 +28,12 @@ rules everywhere. See [Multi-machine setup](#multi-machine-setup).
 6. [The folder structure](#the-folder-structure)
 7. [The seven disciplines](#the-seven-disciplines)
 8. [Discipline subfolders](#discipline-subfolders)
-9. [Naming conventions (strict)](#naming-conventions-strict)
-10. [Worked examples](#worked-examples)
-11. [File metadata (add_meta.py)](#file-metadata-add_metapy)
-12. [Rules & do / don't](#rules--do--dont)
-13. [FAQ](#faq)
+9. [Video / motion projects](#video--motion-projects)
+10. [Naming conventions (strict)](#naming-conventions-strict)
+11. [Worked examples](#worked-examples)
+12. [File metadata (add_meta.py)](#file-metadata-add_metapy)
+13. [Rules & do / don't](#rules--do--dont)
+14. [FAQ](#faq)
 
 ---
 
@@ -159,12 +160,13 @@ python new_project.py <project_name> [options]
 | ------------------------ | -------- | --------------------------- | ------------------------------------------------------------------ |
 | `project_name`           | Yes*     | —                           | Name of the new project. **Use snake_case** (see conventions).     |
 | `--base-dir PATH`        | No       | `.` (current dir)           | Parent directory where the project folder is created.              |
+| `--type ux\|video`       | No       | `ux`                        | `video` builds the fixed video pipeline instead. See [Video / motion projects](#video--motion-projects). |
 | `--profile NAME`         | No       | `~/.uxkit`, else `work`     | Structure profile to use. See [Profiles](#profiles).               |
 | `--stages STAGE ...`     | No       | the profile's stages        | Which stage folders to create. Overrides the profile.              |
 | `--disciplines DISC ...` | No       | the profile's disciplines   | Which disciplines to include. Keys from `--list-disciplines`.      |
 | `--list-profiles`        | No       | —                           | Print profiles, their shape and this machine's default, then exit. |
 | `--list-disciplines`     | No       | —                           | Print discipline keys → folder names, then exit.                   |
-| `--init-global`          | No       | off                         | Also create a shared `_global_workspace/` next to the project.     |
+| `--init-global`          | No       | off                         | Also create a shared `_global_workspace/` next to the project (video: `_assets/` + `_templates/`). |
 | `--force`                | No       | off                         | Overwrite an existing `README.md` (otherwise it is left untouched). |
 | `--dry-run`              | No       | off                         | Print planned actions without writing anything to disk.            |
 
@@ -274,6 +276,78 @@ Convention for the common ones:
 - **`_cache/`** — regenerable temp files (previews, proxies). Safe to delete anytime.
   These folders carry a self-ignoring `.gitignore` (`*` + `!.gitignore`), so the folder
   stays in version control but its contents are **never committed**.
+
+---
+
+## Video / motion projects
+
+Video work flows one way — sources → graphics / 3D / audio → motion → exports — so a video
+project skips stages and gets a **fixed pipeline**. Every folder is always created, whether
+the project is After Effects-heavy or Blender-heavy, and the numbers never change.
+Profiles, `--stages` and `--disciplines` don't apply.
+
+```bash
+python new_project.py product_reveal --type video --base-dir "D:/videos"
+python new_project.py product_reveal --type video --init-global    # + shared _assets/ _templates/
+python new_project.py --list-disciplines --type video
+```
+
+```
+videos/
+├── _assets/                 music · sfx · fonts · luts · brand   ← shared by every project
+├── _templates/              ae · blender
+└── product_reveal/
+    ├── README.md            brief, pipeline, working rules, tracking commands
+    ├── .gitignore           + *.pkf, *.cfa, *.blend1
+    ├── 01_docs/             script, brief, storyboard, client feedback
+    ├── 02_sources/          video · audio · images · other      ← received, never edited
+    ├── 03_graphics/         working · exports · _archive         (Photoshop, Illustrator, Figma)
+    ├── 04_3d/               scenes · assets · renders · renders/_archive · _cache · _archive
+    ├── 05_audio/            sessions · mixdowns · _archive       (Audition)
+    ├── 06_motion/           projects · renders · renders/_archive · _cache · _archive  (After Effects)
+    └── 07_exports/          _archive                             ← what the client receives
+```
+
+- **Came from outside** ⇒ `02_sources/`. **Made by you** ⇒ the folder of the tool that made
+  it. **Used by several projects** ⇒ `videos/_assets/`.
+- `06_motion/renders/` holds full-quality masters; `07_exports/` holds compressed delivery
+  encodes (`product_reveal_full_v03-web.mp4`).
+- App-generated folders (AE `Auto-Save/`, Audition `Backup/` and `Imported Files/`) stay
+  where the app puts them.
+
+### Image sequences
+
+One folder per sequence **and** version, frames named like the folder (see
+[`CONVENTIONS.md`](CONVENTIONS.md#5-image-sequences)):
+
+```
+04_3d/renders/product_reveal_logo_spin_v02/product_reveal_logo_spin_v02_0001.png
+```
+
+- **Blender output path:** `//../renders/product_reveal_logo_spin_v02/product_reveal_logo_spin_v02_`
+  (`//` is the `.blend`'s folder; Blender appends the frame number).
+- **In After Effects:** File › Import, pick the first frame, tick *PNG Sequence*. From
+  `06_motion/projects/` the footage sits at `../../04_3d/renders/…` — AE stores the absolute
+  path but falls back to this relative one, so keep the project folder intact and **never
+  move the `.aep` on its own**.
+- **New version:** render v03 into a new folder, select the v02 item in AE → File › Replace
+  Footage › File (layers, effects and keyframes are kept), then move the v02 folder and its
+  sidecar into `renders/_archive/`. Never overwrite frames in place.
+- **Never rename linked media** to change its status — that breaks the link. Use a sidecar.
+
+### Tracking video projects
+
+| What                                 | Where                                     | How |
+| ------------------------------------ | ----------------------------------------- | --- |
+| Client, deadline, deliverable specs  | project `README.md` → *Brief*             | by hand at kickoff |
+| Render version status                | sidecar beside the render **folder**      | `add_meta.py set 04_3d/renders/<name>_v02 --status review --supersedes <name>_v01` |
+| `.aep` / `.blend` status             | `-wip` / `-review` tag, or a sidecar if another file links to it | rename, or `add_meta.py set` |
+| What was sent and signed off         | sidecar on each file in `07_exports/`     | `--status approved --requested-by client` |
+| One project at a glance              | `INDEX.md` + `assets.csv` in the project  | `add_meta.py index <project>` |
+| Every video project at once          | `INDEX.md` + `assets.csv` in `videos/`    | `add_meta.py index <videos folder>` |
+
+`add_meta.py set` works on folders as well as files; the sidecar (`<folder>.meta.md`) sits
+beside the folder, so it never gets picked up by a sequence import.
 
 ---
 

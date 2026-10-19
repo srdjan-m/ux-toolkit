@@ -12,6 +12,9 @@ When editing an existing codebase, match its conventions instead.
   chronologically (`2026-07_competitor-audit.md`).
 - **Status tags** go in the `-{tag}` slot: `-wip`, `-review`, `-approved`. Variant tags
   share that slot: `-dark`, `-mobile`, `-alt`.
+- **Image sequences:** one folder per sequence and version, frames named like the folder
+  (`{project}_{feature}_v{NN}/{project}_{feature}_v{NN}_0001.png`). Never put status tags
+  on files other files link to (renders, mixdowns) — use a `.meta.md` sidecar.
 - **Folders prefixed `_`** are infrastructure, never deliverables: `_assets`,
   `_templates`, `_archive`, `_cache`.
 - Bump the version for meaningful iterations, not every save; move superseded versions

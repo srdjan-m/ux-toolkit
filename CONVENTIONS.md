@@ -76,13 +76,34 @@ Appended to the version, in the `-{tag}` slot.
 Short **variant** tags use the same slot: `-dark`, `-mobile`, `-alt`. One tag per file —
 if you need two axes, the second belongs in `feature`.
 
+**Never tag a file another file links to** — a render imported into After Effects, a
+mixdown, a graphics export, a `.blend` linked as a library. Renaming it to change the tag
+breaks the link. Record its status in a `.meta.md` sidecar (`add_meta.py`) instead.
+
 ## 4. Version numbers
 
 - Always **two digits**: `v01`, `v02`, … `v10`, so they sort correctly.
 - **Increment for meaningful iterations**, not every save.
 - When a version is superseded, move the old file into the nearest `_archive/`.
 
-## 5. Infrastructure folders
+## 5. Image sequences
+
+```
+{project}_{feature}_v{NN}/{project}_{feature}_v{NN}_{####}.{ext}
+```
+
+One folder per sequence and version; frames carry the folder's name plus a four-digit,
+zero-padded frame number. A new version is a new folder — never overwrite frames in place.
+
+```
+product_reveal_logo_spin_v02/
+├── product_reveal_logo_spin_v02_0001.png
+└── product_reveal_logo_spin_v02_0002.png
+```
+
+Render passes go one level deeper, named by pass: `…_v02/beauty/`, `…_v02/shadow/`.
+
+## 6. Infrastructure folders
 
 Folders prefixed with `_` sort to the top and are infrastructure, not deliverables:
 `_assets`, `_templates`, `_archive`, `_cache`. Never put a deliverable in one.
