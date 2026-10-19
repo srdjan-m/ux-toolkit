@@ -1,0 +1,24 @@
+# {{name}} — examples
+#
+# Concrete cases: this input must give that output. They are language-neutral and become
+# the test suite in every target, so an implementation is "done" only when all of them
+# pass. Aim for every requirement in spec.md to be covered by at least one case, plus the
+# edge cases (empty, boundary, invalid, duplicate, very large).
+#
+# Fields:
+#   id      unique, E-001, E-002, ... (never renumber; retire with `retired: true`)
+#   covers  requirement IDs from spec.md §4
+#   call    operation name from spec.md §5
+#   given   state that must exist before the call (optional)
+#   input   the operation's input fields
+#   expect  either `output:` or `error:` (an error code from spec.md §6)
+#   note    why this case exists, if not obvious (optional)
+
+cases:
+  - id: E-001
+    title: describe the case in a few words
+    covers: [R-001]
+    call: operation_name
+    input: {}
+    expect:
+      output: null

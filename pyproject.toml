@@ -26,6 +26,7 @@ dependencies = []
 [project.scripts]
 new-project = "new_project:main"
 add-meta = "add_meta:main"
+new-spec = "new_spec:main"
 
 [tool.setuptools]
-py-modules = ["new_project", "add_meta"]
+py-modules = ["new_project", "add_meta", "new_spec"]

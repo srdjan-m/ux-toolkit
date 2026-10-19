@@ -6,8 +6,8 @@ Three things, all idempotent:
 
   1. Imports claude/CLAUDE.snippet.md into ~/.claude/CLAUDE.md, so the file naming
      conventions are in context for every session on this machine.
-  2. Links claude/skills/project-organization/ into ~/.claude/skills/, so the folder
-     structure and metadata guidance loads on demand.
+  2. Links each skill in claude/skills/ (project-organization, spec-driven) into
+     ~/.claude/skills/, so their guidance loads on demand.
   3. Writes the machine's default structure profile to ~/.uxkit.
 
 Usage:
@@ -28,11 +28,11 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 SNIPPET = REPO / "claude" / "CLAUDE.snippet.md"
-SKILL_SRC = REPO / "claude" / "skills" / "project-organization"
+SKILLS_SRC = REPO / "claude" / "skills"
 
 CLAUDE_DIR = Path.home() / ".claude"
 CLAUDE_MD = CLAUDE_DIR / "CLAUDE.md"
-SKILL_DST = CLAUDE_DIR / "skills" / "project-organization"
+SKILLS_DST = CLAUDE_DIR / "skills"
 CONFIG = Path.home() / ".uxkit"
 
 # The managed block is delimited so re-running can replace it in place instead of
@@ -145,51 +145,56 @@ def uninstall_claude_md(rep: Reporter) -> None:
         CLAUDE_MD.write_text(strip_block(text), encoding="utf-8")
 
 
-# ── ~/.claude/skills/project-organization ──────────────────────────────────────
+# ── ~/.claude/skills/<skill> ───────────────────────────────────────────────────
+
+def skill_names() -> list[str]:
+    """Every skill shipped in claude/skills/, i.e. each folder holding a SKILL.md."""
+    if not SKILLS_SRC.is_dir():
+        return []
+    return sorted(p.parent.name for p in SKILLS_SRC.glob("*/SKILL.md"))
+
 
 def is_our_copy(path: Path) -> bool:
     return (path / COPY_MARKER).is_file()
 
 
-def install_skill(rep: Reporter, copy: bool, force: bool) -> None:
-    print(f"\n~/.claude/skills/project-organization  ->  {SKILL_SRC}")
-
-    if not SKILL_SRC.is_dir():
-        rep.error(f"skill source not found at {SKILL_SRC}")
-        return
+def install_skill(rep: Reporter, name: str, copy: bool, force: bool) -> None:
+    src = SKILLS_SRC / name
+    dst = SKILLS_DST / name
+    print(f"\n~/.claude/skills/{name}  ->  {src}")
 
     refreshing_copy = False
 
-    if SKILL_DST.is_symlink():
-        current = SKILL_DST.resolve()
-        if current == SKILL_SRC and not copy:
+    if dst.is_symlink():
+        current = dst.resolve()
+        if current == src and not copy:
             rep.skip("already symlinked here")
             return
         rep.act(f"replacing existing symlink (currently -> {current})")
         if rep.apply:
-            SKILL_DST.unlink()
-    elif SKILL_DST.exists():
-        if is_our_copy(SKILL_DST):
+            dst.unlink()
+    elif dst.exists():
+        if is_our_copy(dst):
             # Our own copy from a previous run: replacing it wholesale is how a
             # `git pull` gets picked up, and it drops files deleted upstream.
             refreshing_copy = True
             rep.act("refreshing the copied skill directory")
             if rep.apply:
-                shutil.rmtree(SKILL_DST)
+                shutil.rmtree(dst)
         elif not force:
             # Never silently delete a directory the user may have hand-written.
             rep.error(
-                f"{SKILL_DST} exists, is not a symlink, and wasn't created by this "
+                f"{dst} exists, is not a symlink, and wasn't created by this "
                 "script. Move it aside, or re-run with --force to replace it."
             )
             return
         else:
             rep.act("removing the existing directory (--force)")
             if rep.apply:
-                shutil.rmtree(SKILL_DST)
+                shutil.rmtree(dst)
 
     if rep.apply:
-        SKILL_DST.parent.mkdir(parents=True, exist_ok=True)
+        dst.parent.mkdir(parents=True, exist_ok=True)
 
     # A previous run already proved symlinks don't work here — don't re-fail noisily.
     if not copy and not refreshing_copy:
@@ -197,7 +202,7 @@ def install_skill(rep: Reporter, copy: bool, force: bool) -> None:
         if not rep.apply:
             return
         try:
-            SKILL_DST.symlink_to(SKILL_SRC, target_is_directory=True)
+            dst.symlink_to(src, target_is_directory=True)
             return
         except OSError as exc:
             # Windows needs Developer Mode or an elevated shell for symlinks.
@@ -206,21 +211,22 @@ def install_skill(rep: Reporter, copy: bool, force: bool) -> None:
     if not refreshing_copy:
         rep.act("copying the skill directory — re-run install.py after each git pull")
     if rep.apply:
-        shutil.copytree(SKILL_SRC, SKILL_DST, dirs_exist_ok=True)
-        (SKILL_DST / COPY_MARKER).write_text(
-            f"Copied from {SKILL_SRC} by install.py. Re-run it after `git pull`.\n",
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+        (dst / COPY_MARKER).write_text(
+            f"Copied from {src} by install.py. Re-run it after `git pull`.\n",
             encoding="utf-8",
         )
 
 
-def uninstall_skill(rep: Reporter, force: bool) -> None:
-    print("\n~/.claude/skills/project-organization")
-    if SKILL_DST.is_symlink():
+def uninstall_skill(rep: Reporter, name: str, force: bool) -> None:
+    dst = SKILLS_DST / name
+    print(f"\n~/.claude/skills/{name}")
+    if dst.is_symlink():
         rep.act("removing symlink")
         if rep.apply:
-            SKILL_DST.unlink()
-    elif SKILL_DST.is_dir():
-        ours = is_our_copy(SKILL_DST)
+            dst.unlink()
+    elif dst.is_dir():
+        ours = is_our_copy(dst)
         if not ours and not force:
             rep.error(
                 "a directory is there that this script didn't create; "
@@ -230,7 +236,7 @@ def uninstall_skill(rep: Reporter, force: bool) -> None:
         rep.act("deleting the copied skill directory" if ours
                 else "deleting the directory that was in its place (--force)")
         if rep.apply:
-            shutil.rmtree(SKILL_DST)
+            shutil.rmtree(dst)
     else:
         rep.skip("not installed — nothing to remove")
 
@@ -318,7 +324,7 @@ def main() -> None:
     parser.add_argument(
         "--uninstall",
         action="store_true",
-        help="Remove the CLAUDE.md block and the skill link (~/.uxkit is left alone)",
+        help="Remove the CLAUDE.md block and the skill links (~/.uxkit is left alone)",
     )
     args = parser.parse_args()
 
@@ -328,13 +334,19 @@ def main() -> None:
     if not args.apply:
         print("Dry run — nothing will be written. Re-run with --apply to commit.")
 
+    skills = skill_names()
+    if not skills:
+        rep.error(f"no skills found in {SKILLS_SRC} — is this a complete checkout?")
+
     if args.uninstall:
         uninstall_claude_md(rep)
-        uninstall_skill(rep, args.force)
+        for name in skills:
+            uninstall_skill(rep, name, args.force)
         print(f"\nLeft {CONFIG} in place — delete it by hand if you want it gone.")
     else:
         install_claude_md(rep)
-        install_skill(rep, args.copy, args.force)
+        for name in skills:
+            install_skill(rep, name, args.copy, args.force)
         set_profile(rep, args.profile or "work", explicit=args.profile is not None)
 
     if rep.failed:
