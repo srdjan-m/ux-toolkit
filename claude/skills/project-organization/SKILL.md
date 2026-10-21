@@ -30,7 +30,7 @@ my_app/
 │   │   ├── src/ libs/ _archive/
 │   ├── 02_research/
 │   │   ├── references/ notes/ _archive/
-│   ├── … 07_diagrams/
+│   ├── … 08_docs/
 │   ├── _assets/               ← shared assets for this stage
 │   └── _templates/
 ├── prototyping/  design/  production/
@@ -45,8 +45,10 @@ my_app/
 | `motion`       | `05_motion`       | After Effects projects and exports   | `projects` · `renders` · `_cache` · `_archive`    |
 | `3d`           | `06_3d`           | Blender files, models, rigs, renders | `scenes` · `assets` · `renders` · `_cache` · `_archive` |
 | `diagrams`     | `07_diagrams`     | Flowcharts, schematics, specs        | `working` · `exports` · `_archive`                |
+| `docs`         | `08_docs`         | Pages, guides, documentation text    | `drafts` · `exports` · `_archive`                 |
 
-- **`working/`** — live, editable source (`.fig`, `.ai`, `.aep`, `.blend`).
+- **`working/`** — live, editable source (`.fig`, `.ai`, `.aep`, `.blend`). For `docs`
+  it's **`drafts/`** (editable `.md`).
 - **`exports/`** / **`renders/`** — generated output (`.png`, `.svg`, `.mp4`). Never
   hand-edit; re-export from the source instead.
 - **`_archive/`** — superseded versions worth keeping but not seeing day-to-day.
@@ -59,8 +61,9 @@ signed off, it belongs in `design/` or `prototyping/`.
 ## Placing a file
 
 1. Which stage is the work in? Not signed off ⇒ never `production/`.
-2. Which discipline produced it?
-3. Editable source ⇒ `working/`/`src/`/`projects/`/`scenes/`. Generated ⇒
+2. Which discipline produced it? Written content meant to be read (pages, guides) ⇒
+   `08_docs`; raw input (notes, audits, references) ⇒ `02_research`.
+3. Editable source ⇒ `working/`/`src/`/`drafts/`/`projects/`/`scenes/`. Generated ⇒
    `exports/`/`renders/`. Superseded ⇒ `_archive/`. Regenerable junk ⇒ `_cache/`.
 4. Name it per the conventions already in context.
 

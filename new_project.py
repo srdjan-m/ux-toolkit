@@ -36,6 +36,7 @@ DISCIPLINES = {
     "motion":       ("05_motion",       "After Effects projects and exports"),
     "3d":           ("06_3d",           "Blender files, models, rigs, renders"),
     "diagrams":     ("07_diagrams",     "Flowcharts, schematics, specs"),
+    "docs":         ("08_docs",         "Written content: pages, guides, documentation"),
 }
 
 # Sub-structure within each discipline folder
@@ -47,6 +48,7 @@ DISCIPLINE_SUBFOLDERS = {
     "motion":       ["projects", "renders", "_cache", "_archive"],
     "3d":           ["scenes", "assets", "renders", "_cache", "_archive"],
     "diagrams":     ["working", "exports", "_archive"],
+    "docs":         ["drafts", "exports", "_archive"],
 }
 
 DEFAULT_STAGES = ["research", "prototyping", "design", "production"]

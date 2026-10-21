@@ -26,7 +26,7 @@ rules everywhere. See [Multi-machine setup](#multi-machine-setup).
 4. [Profiles](#profiles)
 5. [Command reference](#command-reference)
 6. [The folder structure](#the-folder-structure)
-7. [The seven disciplines](#the-seven-disciplines)
+7. [The eight disciplines](#the-eight-disciplines)
 8. [Discipline subfolders](#discipline-subfolders)
 9. [Video / motion projects](#video--motion-projects)
 10. [Naming conventions (strict)](#naming-conventions-strict)
@@ -130,7 +130,7 @@ python new_project.py my_app --profile personal
 
 | Profile    | Stages                                          | Disciplines            |
 | ---------- | ----------------------------------------------- | ---------------------- |
-| `work`     | research · prototyping · design · production     | all seven              |
+| `work`     | research · prototyping · design · production     | all eight              |
 | `personal` | exploration · production                         | dev · design · research |
 
 Profiles are plain JSON in `profiles/` (JSON rather than TOML so the toolkit keeps
@@ -211,7 +211,7 @@ my_app_name/
 │   │   ├── references/
 │   │   ├── notes/
 │   │   └── _archive/
-│   ├── 03_design/  … 07_diagrams/
+│   ├── 03_design/  … 08_docs/
 │   ├── _assets/                  ← shared assets for this stage
 │   └── _templates/               ← reusable templates for this stage
 ├── prototyping/                  ← same discipline tree as above
@@ -236,7 +236,7 @@ discipline structure but has **no stages** — it isn't tied to any single proje
 
 ---
 
-## The seven disciplines
+## The eight disciplines
 
 | Key            | Folder             | Use for                                   |
 | -------------- | ------------------ | ----------------------------------------- |
@@ -247,6 +247,7 @@ discipline structure but has **no stages** — it isn't tied to any single proje
 | `motion`       | `05_motion`        | After Effects projects and exports        |
 | `3d`           | `06_3d`            | Blender files, models, rigs, renders      |
 | `diagrams`     | `07_diagrams`      | Flowcharts, schematics, specs             |
+| `docs`         | `08_docs`          | Written content: pages, guides, documentation |
 
 > The numeric prefix is part of the folder name but **not** the key.
 > You pass the key (`dev`, `3d`, …) on the command line; the script creates the
@@ -267,10 +268,12 @@ Each discipline gets a purpose-built set of subfolders:
 | `motion`       | `projects` · `renders` · `_cache` · `_archive`    |
 | `3d`           | `scenes` · `assets` · `renders` · `_cache` · `_archive` |
 | `diagrams`     | `working` · `exports` · `_archive`                |
+| `docs`         | `drafts` · `exports` · `_archive`                 |
 
 Convention for the common ones:
 
 - **`working/`** — live, editable source files (`.fig`, `.ai`, `.aep`, `.blend`).
+- **`drafts/`** — the `docs` equivalent of `working/`: editable text (`.md`) being written.
 - **`exports/`** / **`renders/`** — generated output (`.png`, `.svg`, `.mp4`). Never hand-edit these.
 - **`_archive/`** — superseded versions you want to keep but not see day-to-day.
 - **`_cache/`** — regenerable temp files (previews, proxies). Safe to delete anytime.
