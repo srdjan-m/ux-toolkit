@@ -23,6 +23,7 @@ Each discipline is a reference file. Read the ones the review needs, not all of 
 | `references/color.md` | Colour roles, contrast, states, dark mode. |
 | `references/layout.md` | Grouping, alignment, spacing, priority, responsiveness. |
 | `references/content.md` | Labels, buttons, errors, instructions, translations. |
+| `references/reports_data.md` | **Any report, table, dashboard or generated/compliance output**: summary-vs-data truth, filter behaviour on real data, print/export. |
 
 If the project has a design system (tokens, component docs), read it too and name
 tokens in fixes. Deviations from the project's own system are findings.
@@ -37,11 +38,19 @@ tokens in fixes. Deviations from the project's own system are findings.
    - Image file → Read it.
    - Figma URL → Figma MCP tools: a screenshot for the look, design context for exact
      sizes, colours and tokens. Exact values beat sampled pixels.
-   - Live page → browser screenshot; inspect styles where possible.
+   - Live page → browser screenshot; inspect styles where possible. Pitfalls with
+     headless Chrome/Edge (seen 2026-11-09): a URL with a `#fragment` can capture
+     blank, so capture without it. Headless follows the OS colour scheme, so check
+     which theme you actually got before calling it "light" or "dark".
    - Look at **every state** you can get: default, hover/focus, selected, error, empty,
      loading, longest content, largest text size. Missing states are findings.
+   - **Every output medium.** If the screen is printed, exported or attached (PDF,
+     certification package, email), produce that output and review it too.
 3. **Walk the task** as the user, screen by screen, before checking rules. Note where
    you hesitate — that's usually the most important finding.
+   - **Is the content true?** When the screen summarises data (counts, badges, status
+     banners), cross-check the summary against the rows or source. A summary that
+     omits or misstates items beats any visual issue. See `references/reports_data.md`.
 4. **Check against the references** you loaded.
 5. **Measure, don't eyeball.** Use the bundled script (stdlib Python):
    ```

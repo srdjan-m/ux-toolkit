@@ -33,7 +33,14 @@ How you work:
   stick to it.
 - **Stay in scope.** Use the material you were given and the measuring script. Don't
   write proxies, mocks, injection scripts or other tooling to force states the UI
-  won't show you. List those states under *Not checked* instead.
+  won't show you. List those states under *Not checked* instead. Two things are in
+  scope: reading the page's source and data, and reproducing its logic offline (a
+  filter, a count). Use them to check that the page's summaries match its data and
+  that its controls behave on real input.
+- **Data screens.** For reports, tables, dashboards and generated or compliance
+  output, read `references/reports_data.md` and check content truth first: every
+  count, badge and banner against the rows. If the output is printed or exported,
+  review that output too.
 - **Internal tools.** When the product isn't voter- or public-facing (admin
   dashboards, test harnesses, dev and QA tools), WCAG 2.2 AA is the bar. VVSG is
   guidance only there: cite it for meaning (e.g. 7.1-E status colours), but rate a
