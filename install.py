@@ -2,23 +2,25 @@
 """
 install.py — wire this checkout into Claude Code on the current machine.
 
-Three things, all idempotent:
+Four things, all idempotent:
 
   1. Imports claude/CLAUDE.snippet.md into ~/.claude/CLAUDE.md, so the file naming
      conventions are in context for every session on this machine.
-  2. Links each skill in claude/skills/ (project-organization, spec-driven) into
-     ~/.claude/skills/, so their guidance loads on demand.
-  3. Writes the machine's default structure profile to ~/.uxkit.
+  2. Links each skill in claude/skills/ (project-organization, spec-driven, ux-review)
+     into ~/.claude/skills/, so their guidance loads on demand.
+  3. Links claude/agents/ (ux-critic) into ~/.claude/agents/ux-toolkit/, so the
+     subagents are available in every session.
+  4. Writes the machine's default structure profile to ~/.uxkit.
 
 Usage:
     python install.py                        # inspect first — this is a dry run
     python install.py --apply                # actually make the changes
     python install.py --apply --profile personal
-    python install.py --apply --copy         # copy the skill instead of symlinking
+    python install.py --apply --copy         # copy skills/agents instead of symlinking
     python install.py --uninstall --apply
 
-Re-run after `git pull` only if the skill was copied rather than symlinked (the
-script tells you which happened).
+Re-run after `git pull` only if skills and agents were copied rather than symlinked
+(the script tells you which happened).
 """
 
 import argparse
@@ -29,10 +31,17 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 SNIPPET = REPO / "claude" / "CLAUDE.snippet.md"
 SKILLS_SRC = REPO / "claude" / "skills"
+AGENTS_SRC = REPO / "claude" / "agents"
 
 CLAUDE_DIR = Path.home() / ".claude"
 CLAUDE_MD = CLAUDE_DIR / "CLAUDE.md"
 SKILLS_DST = CLAUDE_DIR / "skills"
+# Agents go into one subfolder rather than loose files in ~/.claude/agents/
+# (decision 2026-11-06). Claude Code scans that folder recursively and identifies an
+# agent by its `name:` field, not its path, so a subfolder works — and it lets the
+# whole set be linked, copied, refreshed and removed as one unit with the same
+# directory logic the skills use, without touching agents the user wrote by hand.
+AGENTS_DST = CLAUDE_DIR / "agents" / "ux-toolkit"
 CONFIG = Path.home() / ".uxkit"
 
 # The managed block is delimited so re-running can replace it in place instead of
@@ -145,7 +154,10 @@ def uninstall_claude_md(rep: Reporter) -> None:
         CLAUDE_MD.write_text(strip_block(text), encoding="utf-8")
 
 
-# ── ~/.claude/skills/<skill> ───────────────────────────────────────────────────
+# ── linked directories (skills and agents) ─────────────────────────────────────
+# Skills and the agents folder are both "a directory in the repo that should appear
+# under ~/.claude/". They share one install/uninstall path so the symlink-or-copy
+# rules, and the refusal to delete hand-made folders, can't drift apart.
 
 def skill_names() -> list[str]:
     """Every skill shipped in claude/skills/, i.e. each folder holding a SKILL.md."""
@@ -154,14 +166,41 @@ def skill_names() -> list[str]:
     return sorted(p.parent.name for p in SKILLS_SRC.glob("*/SKILL.md"))
 
 
+def has_agents() -> bool:
+    """True when claude/agents/ ships at least one agent definition."""
+    return AGENTS_SRC.is_dir() and any(AGENTS_SRC.glob("*.md"))
+
+
 def is_our_copy(path: Path) -> bool:
     return (path / COPY_MARKER).is_file()
 
 
 def install_skill(rep: Reporter, name: str, copy: bool, force: bool) -> None:
-    src = SKILLS_SRC / name
-    dst = SKILLS_DST / name
-    print(f"\n~/.claude/skills/{name}  ->  {src}")
+    install_dir(rep, SKILLS_SRC / name, SKILLS_DST / name,
+                f"~/.claude/skills/{name}", "skill", copy, force)
+
+
+def uninstall_skill(rep: Reporter, name: str, force: bool) -> None:
+    uninstall_dir(rep, SKILLS_DST / name, f"~/.claude/skills/{name}", "skill", force)
+
+
+def install_agents(rep: Reporter, copy: bool, force: bool) -> None:
+    install_dir(rep, AGENTS_SRC, AGENTS_DST,
+                "~/.claude/agents/ux-toolkit", "agents", copy, force)
+
+
+def uninstall_agents(rep: Reporter, force: bool) -> None:
+    uninstall_dir(rep, AGENTS_DST, "~/.claude/agents/ux-toolkit", "agents", force)
+
+
+def install_dir(rep: Reporter, src: Path, dst: Path, label: str, kind: str,
+                copy: bool, force: bool) -> None:
+    """Make `dst` mirror `src`: a symlink when the OS allows it, else a marked copy.
+
+    `label` is the path as shown to the user; `kind` ("skill", "agents") only
+    shapes the messages.
+    """
+    print(f"\n{label}  ->  {src}")
 
     refreshing_copy = False
 
@@ -178,7 +217,7 @@ def install_skill(rep: Reporter, name: str, copy: bool, force: bool) -> None:
             # Our own copy from a previous run: replacing it wholesale is how a
             # `git pull` gets picked up, and it drops files deleted upstream.
             refreshing_copy = True
-            rep.act("refreshing the copied skill directory")
+            rep.act(f"refreshing the copied {kind} directory")
             if rep.apply:
                 shutil.rmtree(dst)
         elif not force:
@@ -209,7 +248,7 @@ def install_skill(rep: Reporter, name: str, copy: bool, force: bool) -> None:
             rep.warn(f"symlink failed ({exc}); falling back to a copy")
 
     if not refreshing_copy:
-        rep.act("copying the skill directory — re-run install.py after each git pull")
+        rep.act(f"copying the {kind} directory — re-run install.py after each git pull")
     if rep.apply:
         shutil.copytree(src, dst, dirs_exist_ok=True)
         (dst / COPY_MARKER).write_text(
@@ -218,9 +257,8 @@ def install_skill(rep: Reporter, name: str, copy: bool, force: bool) -> None:
         )
 
 
-def uninstall_skill(rep: Reporter, name: str, force: bool) -> None:
-    dst = SKILLS_DST / name
-    print(f"\n~/.claude/skills/{name}")
+def uninstall_dir(rep: Reporter, dst: Path, label: str, kind: str, force: bool) -> None:
+    print(f"\n{label}")
     if dst.is_symlink():
         rep.act("removing symlink")
         if rep.apply:
@@ -233,7 +271,7 @@ def uninstall_skill(rep: Reporter, name: str, force: bool) -> None:
                 "re-run with --force to delete it"
             )
             return
-        rep.act("deleting the copied skill directory" if ours
+        rep.act(f"deleting the copied {kind} directory" if ours
                 else "deleting the directory that was in its place (--force)")
         if rep.apply:
             shutil.rmtree(dst)
@@ -314,17 +352,18 @@ def main() -> None:
     parser.add_argument(
         "--copy",
         action="store_true",
-        help="Copy the skill instead of symlinking it (needs a re-run after git pull)",
+        help="Copy skills and agents instead of symlinking (needs a re-run after git pull)",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Replace an existing non-symlinked skill directory",
+        help="Replace an existing non-symlinked skill or agents directory",
     )
     parser.add_argument(
         "--uninstall",
         action="store_true",
-        help="Remove the CLAUDE.md block and the skill links (~/.uxkit is left alone)",
+        help="Remove the CLAUDE.md block and the skill and agent links "
+             "(~/.uxkit is left alone)",
     )
     args = parser.parse_args()
 
@@ -342,18 +381,24 @@ def main() -> None:
         uninstall_claude_md(rep)
         for name in skills:
             uninstall_skill(rep, name, args.force)
+        # Uninstall runs even if the checkout no longer ships agents, so an older
+        # install's ~/.claude/agents/ux-toolkit is still cleaned up.
+        uninstall_agents(rep, args.force)
         print(f"\nLeft {CONFIG} in place — delete it by hand if you want it gone.")
     else:
         install_claude_md(rep)
         for name in skills:
             install_skill(rep, name, args.copy, args.force)
+        if has_agents():
+            install_agents(rep, args.copy, args.force)
         set_profile(rep, args.profile or "work", explicit=args.profile is not None)
 
     if rep.failed:
         print("\nFinished with errors — see [error] lines above.")
         sys.exit(1)
     if args.apply:
-        print("\nDone. Restart Claude Code so it picks up the new CLAUDE.md and skill.")
+        print("\nDone. Restart Claude Code so it picks up the new CLAUDE.md, skills "
+              "and agents.")
     else:
         print("\nLooks right? Re-run with --apply.")
 

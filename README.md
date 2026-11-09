@@ -84,25 +84,26 @@ python install.py --apply                  # work machine (default profile: work
 python install.py --apply --profile personal   # private machine
 ```
 
-`install.py` does three things, all idempotent and all reversible with `--uninstall`:
+`install.py` does four things, all idempotent and all reversible with `--uninstall`:
 
 | What                                        | Where                                    | Why |
 | ------------------------------------------- | ---------------------------------------- | --- |
 | `@`-imports `claude/CLAUDE.snippet.md`      | `~/.claude/CLAUDE.md`                    | Naming rules in context for **every** Claude Code session on the machine |
-| Links `claude/skills/project-organization/` | `~/.claude/skills/`                      | Folder structure + metadata guidance, loaded only when relevant |
+| Links each folder in `claude/skills/`       | `~/.claude/skills/<name>/`               | `project-organization`, `spec-driven`, `ux-review` — loaded only when relevant |
+| Links `claude/agents/`                      | `~/.claude/agents/ux-toolkit/`           | Subagents (`ux-critic`), available in every session |
 | Writes `profile = <name>`                   | `~/.uxkit`                               | This machine's default project shape |
 
 Notes:
 
 - It **never clobbers** your existing `~/.claude/CLAUDE.md` — the import goes in a marked
   block, and everything around it is preserved. `--uninstall` removes just that block.
-- The skill is **symlinked** where possible, so a `git pull` is enough. On Windows without
-  Developer Mode symlinks aren't permitted, so it falls back to a copy and tells you to
-  re-run `install.py` after pulling. `--copy` forces that behaviour anywhere.
-- A `project-organization` directory you wrote yourself is never overwritten without
-  `--force`.
+- Skills and agents are **symlinked** where possible, so a `git pull` is enough. On
+  Windows without Developer Mode symlinks aren't permitted, so it falls back to a copy
+  and tells you to re-run `install.py` after pulling. `--copy` forces that behaviour anywhere.
+- A skill or agents directory you wrote yourself is never overwritten without `--force`.
+  Your own agent files elsewhere in `~/.claude/agents/` are never touched.
 - On macOS, `./install.sh` is a wrapper that finds `python3` for you.
-- Restart Claude Code afterwards so it picks up the new `CLAUDE.md` and skill.
+- Restart Claude Code afterwards so it picks up the new `CLAUDE.md`, skills and agents.
 
 ### Which file holds which rules
 
@@ -113,6 +114,30 @@ Notes:
 | `claude/skills/project-organization/SKILL.md`   | on demand      | Stages, disciplines, file placement, metadata workflow |
 
 Change `CONVENTIONS.md` first, then mirror the change into the other two.
+
+### Design review: `ux-review` skill and `ux-critic` agent
+
+| Piece | Kind | What it holds |
+| --- | --- | --- |
+| `claude/skills/ux-review/` | skill | The **knowledge**: review process, severity scale, report format, and one reference file per discipline (`heuristics`, `accessibility` (WCAG 2.2 AA), `voting_vvsg` (VVSG 2.0), `typography`, `color`, `layout`, `content`) plus `scripts/ux_measure.py` for contrast ratios and px → mm. |
+| `claude/agents/ux-critic.md` | subagent | The **role**: an independent, read-only reviewer that preloads `ux-review` and returns a findings report. |
+
+Use them:
+
+- In conversation: *"review this screen"* (with an image, Figma link or URL) — the
+  skill loads and the review happens in your session, where you can steer it.
+- As an independent second opinion: *"have ux-critic review `ballot_contest_v03.png`
+  for a 21.5-inch 1080p BMD"* — it runs separately and hands back only the report.
+- Measure by hand: `python claude/skills/ux-review/scripts/ux_measure.py contrast 6c6c6c ffffff`
+  or `... size --diag 21.5 --res 1920x1080 --px 48 --font-px 28`.
+
+**Why one skill with many reference files, not one skill per discipline:** skills are
+split by *when they're needed*, not by subject. A review needs typography, colour,
+layout and accessibility together, so they live in one skill, and each reference file
+is read only when that discipline applies. Something with a different trigger and toolset
+— motion design in After Effects, say — gets its own skill. Agents are split by *role*:
+reach for one when the work should happen independently (an unbiased critique, a
+parallel audit), not to hold knowledge.
 
 ---
 
