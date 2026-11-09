@@ -89,8 +89,8 @@ python install.py --apply --profile personal   # private machine
 | What                                        | Where                                    | Why |
 | ------------------------------------------- | ---------------------------------------- | --- |
 | `@`-imports `claude/CLAUDE.snippet.md`      | `~/.claude/CLAUDE.md`                    | Naming rules in context for **every** Claude Code session on the machine |
-| Links each folder in `claude/skills/`       | `~/.claude/skills/<name>/`               | `project-organization`, `spec-driven`, `ux-review` — loaded only when relevant |
-| Links `claude/agents/`                      | `~/.claude/agents/ux-toolkit/`           | Subagents (`ux-critic`), available in every session |
+| Links each folder in `claude/skills/`       | `~/.claude/skills/<name>/`               | `project-organization`, `spec-driven`, `ux-review`, `ux-design`, `ux-personas` — loaded only when relevant |
+| Links `claude/agents/`                      | `~/.claude/agents/ux-toolkit/`           | Subagents (`ux-critic`, `ux-designer`), available in every session |
 | Writes `profile = <name>`                   | `~/.uxkit`                               | This machine's default project shape |
 
 Notes:
@@ -115,12 +115,15 @@ Notes:
 
 Change `CONVENTIONS.md` first, then mirror the change into the other two.
 
-### Design review: `ux-review` skill and `ux-critic` agent
+### Design: `ux-review`, `ux-design`, `ux-personas` skills; `ux-critic`, `ux-designer` agents
 
 | Piece | Kind | What it holds |
 | --- | --- | --- |
-| `claude/skills/ux-review/` | skill | The **knowledge**: review process, severity scale, report format, and one reference file per discipline (`heuristics`, `accessibility` (WCAG 2.2 AA), `voting_vvsg` (VVSG 2.0), `typography`, `color`, `layout`, `content`) plus `scripts/ux_measure.py` for contrast ratios and px → mm. |
-| `claude/agents/ux-critic.md` | subagent | The **role**: an independent, read-only reviewer that preloads `ux-review` and returns a findings report. |
+| `claude/skills/ux-review/` | skill | The **rules**: review process, severity scale, report format, and one reference file per discipline (`heuristics`, `accessibility` (WCAG 2.2 AA), `voting_vvsg` (VVSG 2.0), `typography`, `color` incl. palette harmony, `layout`, `content`, `reports_data`) plus `scripts/ux_measure.py`: `contrast`, `size` (px → mm), `oklch`, `harmony`, `scale`. |
+| `claude/skills/ux-design/` | skill | The **making**: design process and hand-off format, NN/g guidance (`nng_patterns`, `nng_visual`, gathered 2026-11-09 with source links), `icons` (NN/g usability + icon-system craft), `palettes` and `layouts` procedures. |
+| `claude/skills/ux-personas/` | skill | The **people**: 14 voter and 10 staff/observer personas, which to use for which screen, a cognitive-walkthrough method, and a recruiting profile per persona for VVSG 8.3-A / 8.4-A usability tests. |
+| `claude/agents/ux-critic.md` | subagent | Independent, read-only reviewer: preloads `ux-review` + `ux-personas`, returns a findings report. |
+| `claude/agents/ux-designer.md` | subagent | Designer: preloads `ux-design` + `ux-review` + `ux-personas`, writes design files (HTML/CSS mockups, palettes, tokens, Figma) and a hand-off with every decision's source. |
 
 Use them:
 
@@ -129,7 +132,13 @@ Use them:
 - As an independent second opinion: *"have ux-critic review `ballot_contest_v03.png`
   for a 21.5-inch 1080p BMD"* — it runs separately and hands back only the report.
 - Measure by hand: `python claude/skills/ux-review/scripts/ux_measure.py contrast 6c6c6c ffffff`
-  or `... size --diag 21.5 --res 1920x1080 --px 48 --font-px 28`.
+  or `... size --diag 21.5 --res 1920x1080 --px 48 --font-px 28`, `... scale 2f6fdf`,
+  `... harmony 2f6fdf --scheme triadic`, `... oklch HEX HEX ...`.
+- Design: *"have ux-designer propose a palette for the poll-worker dashboard"* or
+  *"…mock up the review screen as HTML"*; then have ux-critic review the result —
+  the designer can't call the critic itself.
+- Personas: *"walk the ballot review screen as V03 and V05"*, or *"which personas
+  should we recruit for testing the language switch?"*.
 
 **Why one skill with many reference files, not one skill per discipline:** skills are
 split by *when they're needed*, not by subject. A review needs typography, colour,
