@@ -20,7 +20,7 @@ Each discipline is a reference file. Read the ones the review needs, not all of 
 | `references/accessibility.md` | Always — WCAG 2.2 AA criteria checkable from a design. |
 | `references/voting_vvsg.md` | **Any voting, ballot, poll-worker or election screen** — VVSG 2.0 requirement IDs with exact values. Stricter than WCAG; the stricter rule wins. |
 | `references/typography.md` | Text hierarchy, sizes, readability. |
-| `references/color.md` | Colour roles, contrast, states, dark mode. |
+| `references/color.md` | Colour roles, contrast, states, dark mode, palette harmony. |
 | `references/layout.md` | Grouping, alignment, spacing, priority, responsiveness. |
 | `references/content.md` | Labels, buttons, errors, instructions, translations. |
 | `references/reports_data.md` | **Any report, table, dashboard or generated/compliance output**: summary-vs-data truth, filter behaviour on real data, print/export. |
@@ -58,7 +58,10 @@ tokens in fixes. Deviations from the project's own system are findings.
    python scripts/ux_measure.py size --diag 21.5 --res 1920x1080 --px 48 --font-px 28
    ```
    Contrast reports WCAG and VVSG pass/fail; size converts px to mm and shows the VVSG
-   minimums for that display. Run it from this skill's directory.
+   minimums for that display. For palette findings, `oklch HEX ...` gives perceived
+   lightness/chroma/hue and their spread, and `harmony BASE [--scheme triadic]` builds
+   hue harmonies to recommend from (see `references/color.md` §5). Run it from this
+   skill's directory.
 6. **Rank and report** (format below). Merge duplicates; one root cause = one finding
    listing every place it occurs.
 

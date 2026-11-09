@@ -50,7 +50,59 @@ light and dark surfaces.
 - Every state (hover, focus, pressed, selected, disabled, error) must be defined in
   *every* theme — missing states in the dark theme are a frequent gap.
 
-## 5. Report language
+## 5. Palette and harmony
+
+Contrast decides whether a palette *works*; this section is about whether it *looks*
+designed. Judge it with numbers from `ux_measure.py oklch HEX ...` (OKLCH: L =
+perceived lightness 0–1, C = chroma/colourfulness, H = hue angle), not by eye.
+
+**What makes a UI palette read as harmonious.** It's mostly not the hue wheel:
+- **Restraint.** Neutrals carry most of the surface; one accent hue carries "primary";
+  status hues appear only where they mean something. Rough guide: ~60 % neutral
+  surfaces, ~30 % secondary surfaces/text, ~10 % accent. Three or more saturated hues
+  competing on one screen is a finding.
+- **Matched lightness and chroma.** Colours used side by side in the same role (chart
+  series, badges, category tags, status set) should sit close in L and C, differing
+  mainly in hue. Check the spread `oklch` reports. One badge visibly louder than its
+  siblings (L or C far off the group) reads as a mistake or as false emphasis.
+- **Tinted neutrals.** Greys pulled slightly toward the accent hue (C ≈ 0.005–0.02)
+  look intentional; pure greys next to a warm accent can look dirty. Neutrals that
+  drift between warm and cool across the UI are a Polish finding.
+- **Tonal scales, not one-offs.** Each hue used for UI states (hover, pressed,
+  selected, subtle background) should come from one scale with even L steps. Hover
+  colours picked ad hoc are a finding: name the scale step to use.
+- **Status hues stay apart from the accent.** If the brand accent is red or orange,
+  error and warning lose meaning; if it's green, so does success. Keep ≥ ~40° of hue
+  between accent and the nearest status hue, or change the status cue (icon + label).
+- **Dark mode lowers chroma.** The same hue at the same C looks louder on dark; expect
+  dark-theme accents at somewhat lower C and higher L than the light theme.
+
+**Hue-wheel harmonies are starting points, not rules.** Use them when a palette needs
+a *new* hue (a second accent, chart series, illustration colours):
+
+| Scheme | Hues (offset from base) | Good for |
+|---|---|---|
+| Analogous | −30°, 0, +30° | Calm, related categories; chart series of one family |
+| Complementary | 0, 180° | One accent against a base; strong contrast, use sparingly |
+| Split complementary | 0, 150°, 210° | Accent plus two supports, less harsh than complementary |
+| Triadic | 0, 120°, 240° | Categorical data with 3 distinct series |
+| Tetradic (square) | 0, 90°, 180°, 270° | 4 categorical series; needs one dominant hue |
+
+`ux_measure.py harmony BASE [--scheme NAME]` builds these in OKLCH, keeping the base's
+L and C (reducing C only where a hue can't reach it in sRGB) and printing the text
+contrast on each colour. Then still check each pair you'll actually use with
+`contrast`, and check colour-blind separation (§2): harmonious hues can still collapse
+for red/green deficiency.
+
+**Recommending a better palette.** In a project with a design system, recommend
+existing tokens or scale steps first; a colour the system lacks is raised as a gap,
+marked as a local value, never silently invented. Without a system, propose a small,
+complete set (neutral scale, one accent scale, four status colours), each given as hex
+with its OKLCH and the contrast it achieves in the role it's meant for. A palette
+critique is usually Polish or Minor; it's Major only when it hurts meaning (status
+confusion, false emphasis, chart series that can't be told apart).
+
+## 6. Report language
 
 Give the measured value and the target, and a fix that keeps the design intent:
 "Helper text #8A8F98 on #FFFFFF = 3.25:1 — fails 1.4.3 (4.5:1). `text-secondary`
